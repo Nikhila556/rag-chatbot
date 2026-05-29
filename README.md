@@ -12,17 +12,19 @@ Backend (FastAPI + async Python)
     ├── Chunk:    Semantic chunking (header-aware, paragraph boundaries, 800 chars / 150 overlap)
     ├── Embed:    Gemini gemini-embedding-001  (3072-dim vectors)
     ├── Store:    PostgreSQL + pgvector
-    ├── Search:   Hybrid (vector cosine + BM25 full-text) fused with RRF
+    ├── Search:   Hybrid (vector cosine + BM25-like PostgreSQL full-text ts_rank) fused with RRF
     ├── Rerank:   LLM cross-encoder reranking (top 8 → top 5)
-    └── Answer:   Gemini gemini-2.5-flash  (streamed, grounded, with citations)
+    ├── Answer:   Gemini gemini-2.5-flash  (streamed, grounded, with citations)
+    └── Evaluate: LLM-as-judge scoring (faithfulness, answer relevancy, context relevancy)
 ```
 
 ## Features
 
 - 📄 Upload PDF, DOCX, DOC, TXT files
+- 📊 RAGAS-style evaluation endpoint — scores answers on faithfulness, relevancy, and context quality
 - 💬 Real-time streaming answers (SSE) — see responses as they're generated
 - 📌 Inline citations with page numbers: `[Page 52, nutrition.pdf]`
-- 🔍 Hybrid search: semantic (vector) + keyword (BM25) combined with Reciprocal Rank Fusion
+- 🔍 Hybrid search: semantic (vector) + BM25-like PostgreSQL full-text search, fused with Reciprocal Rank Fusion
 - 🤖 LLM-based reranking for better relevance
 - 🔄 Query rewriting — expands your question with synonyms before searching
 - 📚 Multi-document support — ask across all documents or scope to one
@@ -77,10 +79,10 @@ Open **http://localhost:5173** in your browser.
 | Concern | Choice | Why |
 |---|---|---|
 | PDF extraction | PyMuPDF (fitz) | Fast, handles tables (converted to markdown), no external API needed |
-| Chunking | Semantic (header + paragraph aware) | Keeps sections together; never cuts mid-sentence |
+| Chunking | Semantic (header + paragraph aware) | Prefers section, paragraph, and sentence boundaries; falls back to word/length splits |
 | Embeddings | `gemini-embedding-001` (3072-dim) | Highest quality in Gemini family |
 | Vector store | PostgreSQL + pgvector | Single service; SQL + vector in one place |
-| Search | Hybrid vector + BM25 + RRF | Vector finds synonyms; BM25 finds exact terms; RRF combines ranks |
+| Search | Hybrid vector + PostgreSQL ts_rank + RRF | Vector finds synonyms; full-text finds exact terms; RRF combines both rankings |
 | Reranking | LLM cross-encoder | Re-scores top-8 candidates for true relevance; falls back to original order on failure |
 | Query rewriting | Gemini LLM | Expands short queries with synonyms and related terms before retrieval |
 | Streaming | FastAPI SSE + async generator | Word-by-word streaming; user sees answer as it's generated |
@@ -91,19 +93,19 @@ Open **http://localhost:5173** in your browser.
 
 ```env
 GEMINI_API_KEY=your_key_here
-DATABASE_URL=postgresql+asyncpg://rag:rag@localhost:5432/ragdb   # optional override
+DATABASE_URL=postgresql+asyncpg://rag:rag@localhost:5433/ragdb   # optional override (Docker maps 5433→5432)
 ```
 
 ## Project Structure
 
 ```
-rag-system/
+rag-chatbot/
 ├── backend/
 │   ├── app/
 │   │   ├── core/           # config, database
 │   │   ├── models/         # SQLAlchemy models (Document, Chunk, Conversation, Message)
 │   │   ├── services/       # ingestion, embedding, retrieval, rerank, answer, query_rewrite
-│   │   └── api/routes/     # documents, chat (streaming), history
+│   │   └── api/routes/     # documents, chat (streaming), history, evaluate
 │   ├── requirements.txt
 │   └── .env.example
 ├── frontend/
