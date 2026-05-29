@@ -1,0 +1,10 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+pgvector==0.3.5
+google-genai>=1.0.0
+pydantic-settings==2.6.1
+python-multipart==0.0.12
+pymupdf==1.25.5
+python-docx==1.1.2
